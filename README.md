@@ -3,7 +3,7 @@
 
 
 # @propero/security
-
+safe and simple handling of passwords, tokens, etc
 
 ## Installation
 ```shell
