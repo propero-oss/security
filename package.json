@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "safe and simple handling of passwords, tokens, etc",
   "since": 2023,
-  "main": "dist/index.cjs",
+  "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "scripts": {
