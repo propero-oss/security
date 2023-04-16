@@ -1,4 +1,4 @@
-name: deploy-master
+name: deploy-main
 on:
   push:
     branches:
