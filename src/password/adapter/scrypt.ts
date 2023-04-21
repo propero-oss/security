@@ -60,7 +60,7 @@ export function scrypt(options: ScryptAdapterOptions = {}): PasswordHashAdapter 
   function comparePreferDefined<T extends Record<string, number | undefined>>(a: T, b: T, keys: (keyof T)[]) {
     for (const key of keys) {
       if (a[key] != null && b[key] != null)
-        if (a[key] < b[key]) return true;
+        if (a[key]! < b[key]!) return true;
         else continue;
       if (a[key] != null || b[key] != null) return true;
     }
