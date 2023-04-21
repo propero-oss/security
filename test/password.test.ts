@@ -1,103 +1,110 @@
 import { Password } from "src/password";
+import { argon2 } from "src/password/adapter/argon2";
+import { bcrypt } from "src/password/adapter/bcrypt";
+import { pbkdf2 } from "src/password/adapter/pbkdf2";
+import { scrypt } from "src/password/adapter/scrypt";
 
-Password.configure({ iterations: 1000 }); // faster tests
+Password.use(pbkdf2());
+
+beforeEach(() => {
+  Password.adapters.splice(0, Password.adapters.length);
+});
 
 describe("Password", () => {
+  it("should throw for hashes with no matching strategy", async () => {
+    expect(() => new Password("foo")).toThrow();
+  });
+
   it("should hash a password", async () => {
+    Password.use(pbkdf2());
     const password = await Password.hash("foo");
     expect(password.hash).toBeDefined();
   });
 
-  it("should generate different salts for the same password", async () => {
-    const { salt: first } = await Password.hash("foo");
-    const { salt: second } = await Password.hash("foo");
+  it("should generate different hashes for the same password", async () => {
+    Password.use(pbkdf2());
+    const { hash: first } = await Password.hash("foo");
+    const { hash: second } = await Password.hash("foo");
     expect(first).not.toEqual(second);
   });
 
   it("should verify passwords", async () => {
+    Password.use(pbkdf2());
     const password = await Password.hash("foo");
     expect(await password.verify("foo")).toBeTruthy();
     expect(await password.verify("bar")).toBeFalsy();
   });
 
   it("should upgrade passwords if applicable", async () => {
+    Password.use(pbkdf2());
     const password = await Password.hash("foo");
-    const { hash, salt, settings } = password;
-    Password.configure({ iterations: 2000 });
+    const { hash } = password;
+    expect(await password.verify("foo")).toBeTruthy();
+    Password.use(argon2());
     expect(await password.verifyAndUpgrade("foo")).toBeTruthy();
     expect(password.hash).not.toEqual(hash);
-    expect(password.salt).not.toEqual(salt);
-    expect(password.settings.iterations).not.toEqual(settings.iterations);
-    Password.configure({ iterations: 1000 });
   });
 
-  it("should not downgrade passwords", async () => {
+  it("should not downgrade passwords to lower grade adapters", async () => {
+    Password.use(argon2());
     const password = await Password.hash("foo");
-    const { hash, salt, settings } = password;
-    Password.configure({ iterations: 500 });
+    Password.use(pbkdf2());
     expect(await password.verifyAndUpgrade("foo")).toBeTruthy();
-    expect(password.hash).toEqual(hash);
-    expect(password.salt).toEqual(salt);
-    expect(password.settings.iterations).toEqual(settings.iterations);
-    Password.configure({ iterations: 1000 });
-  });
-
-  it("should serialise passwords to json", async () => {
-    const password = await Password.hash("foo", "bar");
-    const json = JSON.stringify(password);
-    expect(JSON.parse(json)).toEqual({
-      hash: "drpt7Fw/amBwTXMKKkuqHFlvJ4rjVAjuXWfs4JQsFPQkUrqGvYh/Dmv4Y0TPl8wKVjb6wQ7EvNYvZHE/YGjSJbnZ1eptHuqtg/d1RDx6bEt801ergxp85bws0k57LJMHH9K5yx9XTxt7rsYvSQfcQHcdvJnnMOcMrX8a+o2VdP2fWQTSwSx8ZrE4ozxc7WuYpeCevVD97BYhiLfpmsLMLb5atcgHLlpxLPNUeyHFMAqfNJi4oOVbQ6wdWLO5JrIXEgI+WBuIR6G7/NwGJ3qyAm5c8gBNMObO3mfhgdrsarB4qtFSoVmwrNBHVPxitwGiR2JlInpwhWSzmkqaI0zBeA==",
-      salt: "bar",
-      iterations: 1000,
-      digest: "sha512",
-      saltLength: 64,
-      passwordLength: 256,
-    });
+    expect(password.hash.startsWith("$argon2")).toBeTruthy();
   });
 
   it("should serialise passwords to string", async () => {
-    const password = await Password.hash("foo", "bar");
+    Password.use(pbkdf2());
+    const password = await Password.hash("foo");
     const str = String(password);
-    expect(str).toEqual(
-      [
-        "sha512",
-        1000,
-        256,
-        64,
-        "drpt7Fw/amBwTXMKKkuqHFlvJ4rjVAjuXWfs4JQsFPQkUrqGvYh/Dmv4Y0TPl8wKVjb6wQ7EvNYvZHE/YGjSJbnZ1eptHuqtg/d1RDx6bEt801ergxp85bws0k57LJMHH9K5yx9XTxt7rsYvSQfcQHcdvJnnMOcMrX8a+o2VdP2fWQTSwSx8ZrE4ozxc7WuYpeCevVD97BYhiLfpmsLMLb5atcgHLlpxLPNUeyHFMAqfNJi4oOVbQ6wdWLO5JrIXEgI+WBuIR6G7/NwGJ3qyAm5c8gBNMObO3mfhgdrsarB4qtFSoVmwrNBHVPxitwGiR2JlInpwhWSzmkqaI0zBeA==",
-        "bar",
-      ].join(":")
-    );
-  });
-
-  it("should deserialise passwords from json", async () => {
-    const password = Password.parse({
-      hash: "drpt7Fw/amBwTXMKKkuqHFlvJ4rjVAjuXWfs4JQsFPQkUrqGvYh/Dmv4Y0TPl8wKVjb6wQ7EvNYvZHE/YGjSJbnZ1eptHuqtg/d1RDx6bEt801ergxp85bws0k57LJMHH9K5yx9XTxt7rsYvSQfcQHcdvJnnMOcMrX8a+o2VdP2fWQTSwSx8ZrE4ozxc7WuYpeCevVD97BYhiLfpmsLMLb5atcgHLlpxLPNUeyHFMAqfNJi4oOVbQ6wdWLO5JrIXEgI+WBuIR6G7/NwGJ3qyAm5c8gBNMObO3mfhgdrsarB4qtFSoVmwrNBHVPxitwGiR2JlInpwhWSzmkqaI0zBeA==",
-      salt: "bar",
-      iterations: 1000,
-      digest: "sha512",
-      saltLength: 64,
-      passwordLength: 256,
-    });
-    expect(await password.verify("foo")).toBeTruthy();
-  });
-
-  it("should deserialise passwords from strings", async () => {
-    const password = Password.parse(
-      [
-        "sha512",
-        1000,
-        256,
-        64,
-        "drpt7Fw/amBwTXMKKkuqHFlvJ4rjVAjuXWfs4JQsFPQkUrqGvYh/Dmv4Y0TPl8wKVjb6wQ7EvNYvZHE/YGjSJbnZ1eptHuqtg/d1RDx6bEt801ergxp85bws0k57LJMHH9K5yx9XTxt7rsYvSQfcQHcdvJnnMOcMrX8a+o2VdP2fWQTSwSx8ZrE4ozxc7WuYpeCevVD97BYhiLfpmsLMLb5atcgHLlpxLPNUeyHFMAqfNJi4oOVbQ6wdWLO5JrIXEgI+WBuIR6G7/NwGJ3qyAm5c8gBNMObO3mfhgdrsarB4qtFSoVmwrNBHVPxitwGiR2JlInpwhWSzmkqaI0zBeA==",
-        "bar",
-      ].join(":")
-    );
-    expect(await password.verify("foo")).toBeTruthy();
+    Password.use(argon2());
+    const parsed = new Password(str);
+    expect(password).toEqual(parsed);
+    expect(await parsed.verify("foo")).toBeTruthy();
   });
 
   it("should be tagged as Password", async () => {
+    Password.use(argon2());
     const tag = Object.prototype.toString.call(await Password.hash("foo"));
     expect(tag).toEqual("[object Password]");
+  });
+
+  describe("adapters", () => {
+    it("should work with argon2", async () => {
+      Password.use(argon2());
+      const password = await Password.hash("foo");
+      const str = String(password);
+      const parsed = new Password(str);
+      expect(password).toEqual(parsed);
+      expect(await parsed.verify("bar")).toBeFalsy();
+      expect(await parsed.verifyAndUpgrade("foo")).toBeTruthy();
+    });
+    it("should work with pbkdf2", async () => {
+      Password.use(pbkdf2());
+      const password = await Password.hash("foo");
+      const str = String(password);
+      const parsed = new Password(str);
+      expect(password).toEqual(parsed);
+      expect(await parsed.verify("bar")).toBeFalsy();
+      expect(await parsed.verifyAndUpgrade("foo")).toBeTruthy();
+    });
+    it("should work with scrypt", async () => {
+      Password.use(scrypt());
+      const password = await Password.hash("foo");
+      const str = String(password);
+      const parsed = new Password(str);
+      expect(password).toEqual(parsed);
+      expect(await parsed.verify("bar")).toBeFalsy();
+      expect(await parsed.verifyAndUpgrade("foo")).toBeTruthy();
+    });
+    it("should work with bcrypt", async () => {
+      Password.use(bcrypt());
+      const password = await Password.hash("foo");
+      const str = String(password);
+      const parsed = new Password(str);
+      expect(password).toEqual(parsed);
+      expect(await parsed.verify("bar")).toBeFalsy();
+      expect(await parsed.verifyAndUpgrade("foo")).toBeTruthy();
+    });
   });
 });

@@ -19,13 +19,14 @@
   "license": "MIT",
   "url": "https://reichwald.me/",
   "devDependencies": {
-    "@semantic-release/npm": "^10.0.3",
-    "@semantic-release/github": "^8.0.7",
+    "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^9.0.2",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/github": "^8.0.7",
+    "@semantic-release/npm": "^10.0.3",
     "@semantic-release/release-notes-generator": "^10.0.3",
     "@swc/jest": "^0.2.26",
+    "@types/bcrypt": "^5.0.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.58.0",
@@ -43,6 +44,40 @@
     "access": "public"
   },
   "release": {
-    "branches": ["main"]
-  }
+    "branches": [
+      "main"
+    ]
+  },
+  "optionalDependencies": {
+    "@node-rs/argon2": "^1.4.0",
+    "bcrypt": "^5.1.0",
+    "scrypt": "^6.0.3"
+  },
+  "exports": [
+    {
+      "node": "./",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    {
+      "node": "./password/adapter/argon2",
+      "import": "./dist/password/adapter/argon2.mjs",
+      "require": "./dist/password/adapter/argon2.js"
+    },
+    {
+      "node": "./password/adapter/bcrypt",
+      "import": "./dist/password/adapter/bcrypt.mjs",
+      "require": "./dist/password/adapter/bcrypt.js"
+    },
+    {
+      "node": "./password/adapter/scrypt",
+      "import": "./dist/password/adapter/scrypt.mjs",
+      "require": "./dist/password/adapter/scrypt.js"
+    },
+    {
+      "node": "./password/adapter/pbkdf2",
+      "import": "./dist/password/adapter/pbkdf2.mjs",
+      "require": "./dist/password/adapter/pbkdf2.js"
+    }
+  ]
 }
